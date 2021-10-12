@@ -259,10 +259,6 @@ public class PrinterBuffer {
 
         // 4. 換行
         appendNewLine()
-
-        if (fontSize != FontSize.SMALL) {
-            appendNewLine()
-        }
     }
 
     // region 圖片
