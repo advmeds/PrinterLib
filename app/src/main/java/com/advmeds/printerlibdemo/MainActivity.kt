@@ -1,67 +1,99 @@
 package com.advmeds.printerlibdemo
 
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
-import com.advmeds.printerlib.BLEPrintService
 import com.advmeds.printerlib.PrinterBuffer
-import com.vise.baseble.ViseBle
-import com.vise.baseble.callback.scan.IScanCallback
-import com.vise.baseble.callback.scan.ScanCallback
-import com.vise.baseble.model.BluetoothLeDevice
-import com.vise.baseble.model.BluetoothLeDeviceStore
-import pub.devrel.easypermissions.EasyPermissions
+import com.advmeds.printerlib.PrinterServiceDelegate
+import android.content.*
+import android.hardware.usb.UsbConstants
+import androidx.activity.result.contract.ActivityResultContracts
+import com.advmeds.printerlib.BluetoothPrinterService
 import java.text.SimpleDateFormat
 import java.util.*
 
-class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
+class MainActivity : AppCompatActivity() {
     private val mainRecyclerView: RecyclerView by lazy { findViewById(R.id.main_rv) }
     private val mainAdapter = MainAdapter { position ->
         Log.d("onItemClick", position.toString())
 
         val device = devices[position]
-
-        printService.connect(device.device)
+        printService.connect(device)
     }
-    private var devices = mutableListOf<BluetoothLeDevice>()
+    private var devices = mutableListOf<BluetoothDevice>()
 
-    private val scanCallback: ScanCallback by lazy {
-        ScanCallback(object : IScanCallback {
+    /** 確認使用者授權的Callback */
+    private val bleForResult =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            if (result.values.find { !it } == null) {
+                enableBluetoothService()
+            }
+        }
 
-            override fun onDeviceFound(bluetoothLeDevice: BluetoothLeDevice?) {
-                bluetoothLeDevice?.name ?: return
+    /** Create a BroadcastReceiver for ACTION_STATE_CHANGED. */
+    private val detectBluetoothStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when(intent.action) {
+                BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                    // Discovery has found a device. Get the BluetoothDevice
+                    // object and its info from the Intent.
+                    val prevState = intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, 0)
+                    val currState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, 0)
+                    Log.d("ACTION_STATE_CHANGED", "prevState: $prevState, currState: $currState")
 
-                if (!devices.map { it.address }.contains(bluetoothLeDevice.address)) {
-                    Log.d("IScanCallback", "onDeviceFound: $bluetoothLeDevice")
-                    devices.add(bluetoothLeDevice)
-                    mainAdapter.dataSet = devices.map { it.name }
-                    mainAdapter.notifyDataSetChanged()
+                    when (currState) {
+                        BluetoothAdapter.STATE_ON -> {
+                            startScan()
+                        }
+                        BluetoothAdapter.STATE_TURNING_OFF -> {
+                            stopScan()
+                        }
+                        BluetoothAdapter.STATE_OFF -> {
+                            BluetoothAdapter.getDefaultAdapter().enable()
+                        }
+                    }
                 }
             }
-
-            override fun onScanFinish(bluetoothLeDeviceStore: BluetoothLeDeviceStore?) {
-
-            }
-
-            override fun onScanTimeout() {
-
-            }
-        })
+        }
     }
 
-    private val printCallback = object : BLEPrintService.BLEPrintServiceDelegate {
-        override fun onStateChanged(state: BLEPrintService.State) {
+    // Create a BroadcastReceiver for ACTION_FOUND.
+    private val detectBluetoothDeviceReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                BluetoothDevice.ACTION_FOUND -> {
+                    // Discovery has found a device. Get the BluetoothDevice
+                    // object and its info from the Intent.
+                    val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+
+                    device ?: return
+
+                    if (!devices.map { it.address }.contains(device.address)) {
+                        Log.d("ACTION_FOUND", device.name)
+                        devices.add(device)
+                        mainAdapter.dataSet = devices.map { it.name }
+                        mainAdapter.notifyDataSetChanged()
+                    }
+                }
+            }
+        }
+    }
+
+    private val printCallback = object : PrinterServiceDelegate {
+        override fun onStateChanged(state: PrinterServiceDelegate.State) {
             Log.d("onStateChanged", state.toString())
 
             when (state) {
-                BLEPrintService.State.NONE -> {
-
+                PrinterServiceDelegate.State.NONE -> {
+                    startScan()
                 }
-                BLEPrintService.State.CONNECTING -> {
-
+                PrinterServiceDelegate.State.CONNECTING -> {
+                    stopScan()
                 }
-                BLEPrintService.State.CONNECTED -> {
+                PrinterServiceDelegate.State.CONNECTED -> {
                     val printer = PrinterBuffer()
                     printer.appendText(
                         "煩請親自依「掛號燈號」至櫃台掛號。過號或號碼單遺失者，請重新抽號。",
@@ -93,13 +125,27 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
             }
         }
     }
-    private var printService: BLEPrintService = BLEPrintService(this, printCallback)
+
+    private lateinit var printService: BluetoothPrinterService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         mainRecyclerView.adapter = mainAdapter
+
+        val bluetoothStateFilter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        registerReceiver(
+            detectBluetoothStateReceiver,
+            bluetoothStateFilter
+        )
+
+        val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
+        registerReceiver(detectBluetoothDeviceReceiver, filter)
+
+        requestBluetoothPermissions()
+
+        printService = BluetoothPrinterService(this, printCallback)
     }
 
     override fun onResume() {
@@ -111,13 +157,7 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
     override fun onPause() {
         super.onPause()
 
-        ViseBle.getInstance().stopScan(scanCallback)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-
-        printService.disconnect()
+        stopScan()
     }
 
     private fun requestBluetoothPermissions() {
@@ -128,38 +168,62 @@ class MainActivity : AppCompatActivity(), EasyPermissions.PermissionCallbacks {
             android.Manifest.permission.ACCESS_COARSE_LOCATION
         )
 
-        if (EasyPermissions.hasPermissions(this, *permissions)) {
+        bleForResult.launch(permissions)
+    }
+
+    private fun enableBluetoothService() {
+        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+
+        if (bluetoothAdapter.isEnabled) {
             startScan()
         } else {
-            EasyPermissions.requestPermissions(
-                this,
-                "${getString(R.string.app_name)}希望能夠啟用權限來連接藍牙設備",
-                0,
-                *permissions
-            )
+//            val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+//            bleForResult.launch(enableBtIntent)
+            bluetoothAdapter.enable()
         }
     }
 
-    // 開始掃描藍牙設備
+    /** 開始掃描藍牙設備 */
     private fun startScan() {
-        if (scanCallback.isScanning) return
-        ViseBle.getInstance().startScan(scanCallback)
+        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+
+        if (bluetoothAdapter.isDiscovering || printService.state != PrinterServiceDelegate.State.NONE) return
+        Log.d("MainActivity", "startDiscovery")
+
+        if (bluetoothAdapter.isEnabled) {
+            bluetoothAdapter.startDiscovery()
+        }
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this)
+    /** 停止掃描藍牙設備 */
+    private fun stopScan() {
+        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+
+        if (!bluetoothAdapter.isDiscovering) return
+        Log.d("MainActivity", "cancelDiscovery")
+
+        if (bluetoothAdapter.isEnabled) {
+            bluetoothAdapter.cancelDiscovery()
+        }
     }
 
-    override fun onPermissionsGranted(requestCode: Int, perms: MutableList<String>) {
-        startScan()
-    }
+    override fun onDestroy() {
+        super.onDestroy()
 
-    override fun onPermissionsDenied(requestCode: Int, perms: MutableList<String>) {
+        printService.disconnect()
 
+        stopScan()
+
+        try {
+            unregisterReceiver(detectBluetoothStateReceiver)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        try {
+            unregisterReceiver(detectBluetoothDeviceReceiver)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }

@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId "com.advmeds.printerlibdemo"
-        minSdkVersion 19
+        minSdkVersion 21
         targetSdkVersion 30
         versionCode 1
         versionName "1.0"
@@ -42,9 +42,6 @@ dependencies {
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
-
-    implementation 'com.vise.xiaoyaoyou:baseble:2.0.6'
-    implementation 'pub.devrel:easypermissions:3.0.0'
 
     implementation project(":PrinterLib")
 }
