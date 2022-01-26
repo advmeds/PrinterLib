@@ -6,24 +6,21 @@ import android.content.Context
 import android.os.Handler
 import android.util.Log
 import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
-import java.text.SimpleDateFormat
 import java.util.*
 
-public class BLEPrintService(
+public class BluetoothPrinterService(
     private val context: Context,
-    public var delegate: BLEPrintServiceDelegate? = null
+    public var delegate: PrinterServiceDelegate? = null
 ) {
     companion object {
-        private const val TAG = "BLEPrintService"
+        private const val TAG = "BluetoothPrinterService"
         private const val SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB"
     }
 
     private var mConnectThread: ConnectThread? = null
     private var mConnectedThread: ConnectedThread? = null
 
-    public var state: State = State.NONE
+    public var state: PrinterServiceDelegate.State = PrinterServiceDelegate.State.NONE
         private set
 
     /**
@@ -36,7 +33,7 @@ public class BLEPrintService(
         Log.d(TAG, "connect to: $device")
 
         // Cancel any thread attempting to make a connection
-        if (state == State.CONNECTING) {
+        if (state == PrinterServiceDelegate.State.CONNECTING) {
             if (mConnectThread != null) {
                 mConnectThread?.cancel()
                 mConnectThread = null
@@ -103,7 +100,7 @@ public class BLEPrintService(
             mConnectedThread = null
         }
 
-        state = State.NONE
+        state = PrinterServiceDelegate.State.NONE
 
         Handler(context.mainLooper).post {
             delegate?.onStateChanged(state)
@@ -121,7 +118,7 @@ public class BLEPrintService(
         var r: ConnectedThread
         // Synchronize a copy of the ConnectedThread
         synchronized(this) {
-            if (state !== State.CONNECTED) return
+            if (state !== PrinterServiceDelegate.State.CONNECTED) return
             r = mConnectedThread!!
         }
 
@@ -133,7 +130,7 @@ public class BLEPrintService(
      * Indicate that the connection attempt failed and notify the UI Activity.
      */
     private fun connectionFailed() {
-        state = State.NONE
+        state = PrinterServiceDelegate.State.NONE
 
         Handler(context.mainLooper).post {
             delegate?.onStateChanged(state)
@@ -144,26 +141,11 @@ public class BLEPrintService(
      * Indicate that the connection was lost and notify the UI Activity.
      */
     private fun connectionLost() {
-        state = State.NONE
+        state = PrinterServiceDelegate.State.NONE
 
         Handler(context.mainLooper).post {
             delegate?.onStateChanged(state)
         }
-    }
-
-    public interface BLEPrintServiceDelegate {
-        fun onStateChanged(state: State)
-    }
-
-    public enum class State {
-        /** we're doing nothing */
-        NONE,
-
-        /** now initiating an outgoing connection */
-        CONNECTING,
-
-        /** now connected to a remote device */
-        CONNECTED;
     }
 
     /**
@@ -179,7 +161,7 @@ public class BLEPrintService(
         }
 
         init {
-            this@BLEPrintService.state = BLEPrintService.State.CONNECTING
+            this@BluetoothPrinterService.state = PrinterServiceDelegate.State.CONNECTING
         }
 
         override fun run() {
@@ -201,7 +183,7 @@ public class BLEPrintService(
                 return
             }
 
-            synchronized(this@BLEPrintService) {
+            synchronized(this@BluetoothPrinterService) {
                 mConnectThread = null
             }
 
@@ -230,18 +212,16 @@ public class BLEPrintService(
         private val mmBuffer = ByteArray(1024)
 
         init {
-            this@BLEPrintService.state = BLEPrintService.State.CONNECTED
+            this@BluetoothPrinterService.state = PrinterServiceDelegate.State.CONNECTED
         }
 
         override fun run() {
             var numBytes: Int
 
-            while (this@BLEPrintService.state == BLEPrintService.State.CONNECTED) {
-                Log.d("ConnectedThread", "123")
-
+            while (this@BluetoothPrinterService.state == PrinterServiceDelegate.State.CONNECTED) {
                 try {
                     numBytes = mmInStream.read(mmBuffer)
-                    Log.d("BluetoothSocket", numBytes.toString())
+                    Log.d(TAG, "read: ${mmBuffer.copyOf(numBytes).decodeToString()}")
                 } catch (e: IOException) {
                     Log.e(TAG, "disconnected", e)
                     connectionLost()
