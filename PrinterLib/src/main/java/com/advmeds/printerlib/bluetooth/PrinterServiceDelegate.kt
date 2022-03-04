@@ -1,4 +1,4 @@
-package com.advmeds.printerlib
+package com.advmeds.printerlib.bluetooth
 
 public interface PrinterServiceDelegate {
 

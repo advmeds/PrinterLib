@@ -1,4 +1,4 @@
-package com.advmeds.printerlib
+package com.advmeds.printerlib.bluetooth
 
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket

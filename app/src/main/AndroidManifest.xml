@@ -25,7 +25,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name="com.advmeds.printerlib.BluetoothLEPrinterService" />
+        <service android:name="com.advmeds.printerlib.bluetooth.BluetoothLEPrinterService" />
     </application>
 
 </manifest>

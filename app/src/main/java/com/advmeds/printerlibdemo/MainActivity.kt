@@ -1,21 +1,28 @@
 package com.advmeds.printerlibdemo
 
+import android.app.PendingIntent
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
-import com.advmeds.printerlib.PrinterBuffer
-import com.advmeds.printerlib.PrinterServiceDelegate
-import android.content.*
-import android.hardware.usb.UsbConstants
-import androidx.activity.result.contract.ActivityResultContracts
-import com.advmeds.printerlib.BluetoothPrinterService
-import java.text.SimpleDateFormat
-import java.util.*
+import com.advmeds.printerlib.bluetooth.BluetoothPrinterService
+import com.advmeds.printerlib.bluetooth.PrinterServiceDelegate
+import com.advmeds.printerlib.usb.BPT3XPrinterService
+import com.advmeds.printerlib.utils.PrinterBuffer
 
 class MainActivity : AppCompatActivity() {
+    companion object {
+        private const val USB_PERMISSION = "${BuildConfig.APPLICATION_ID}.USB_PERMISSION"
+    }
     private val mainRecyclerView: RecyclerView by lazy { findViewById(R.id.main_rv) }
     private val mainAdapter = MainAdapter { position ->
         Log.d("onItemClick", position.toString())
@@ -69,7 +76,7 @@ class MainActivity : AppCompatActivity() {
                     // object and its info from the Intent.
                     val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
 
-                    device ?: return
+                    device?.name ?: return
 
                     if (!devices.map { it.address }.contains(device.address)) {
                         Log.d("ACTION_FOUND", device.name)
@@ -94,33 +101,25 @@ class MainActivity : AppCompatActivity() {
                     stopScan()
                 }
                 PrinterServiceDelegate.State.CONNECTED -> {
-                    val printer = PrinterBuffer()
-                    printer.appendText(
-                        "煩請親自依「掛號燈號」至櫃台掛號。過號或號碼單遺失者，請重新抽號。",
-                        PrinterBuffer.TextAlignment.LEFT,
-                        PrinterBuffer.FontSize.MIDDLE
+                    val commandList = arrayListOf(
+                        PrinterBuffer.initializePrinter(),
+                        PrinterBuffer.selectAlignment(PrinterBuffer.Alignment.CENTER),
+                        strToBytes("煩請親自依「掛號燈號」至櫃檯掛號。過號或號碼單遺失者，請重新抽號。"),
+                        PrinterBuffer.printAndFeedLine(),
+                        strToBytes(String.format("%04d", 69)),
+                        PrinterBuffer.printAndFeedLine(),
+                        PrinterBuffer.selectAlignment(PrinterBuffer.Alignment.CENTER),
+                        PrinterBuffer.selectHRICharacterPrintPosition(PrinterBuffer.HRIAlignment.TOP),
+                        PrinterBuffer.setBarcodeWidth(3),
+                        PrinterBuffer.setBarcodeHeight(162),
+                        PrinterBuffer.printBarcode(PrinterBuffer.BarCodeSystem2.CODE39, 10, "B12345789"),
+                        PrinterBuffer.printAndFeedLine(),
+                        PrinterBuffer.selectCutPagerModerAndCutPager(66, 1),
                     )
-                    printer.appendDivider()
-                    printer.appendText(
-                        "掛完號請依「就診燈號」看診。謝謝您的合作！",
-                        PrinterBuffer.TextAlignment.LEFT,
-                        PrinterBuffer.FontSize.MIDDLE
-                    )
-                    printer.appendText(
-                        String.format("%04d", 69),
-                        PrinterBuffer.TextAlignment.CENTER,
-                        PrinterBuffer.FontSize.BIG
-                    )
-                    val now = Date()
-                    val formatter = SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.TAIWAN)
-                    formatter.timeZone = TimeZone.getTimeZone("Asia/Taipei")
-                    printer.appendText(
-                        formatter.format(now),
-                        PrinterBuffer.TextAlignment.CENTER
-                    )
-                    printer.appendNewLine()
 
-                    printService.write(printer.data)
+                    commandList.forEach {
+                        printService.write(it)
+                    }
                 }
             }
         }
@@ -128,36 +127,107 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var printService: BluetoothPrinterService
 
+    private val detectUsbDeviceReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val usbDevice = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE) ?: return
+
+            when (intent.action) {
+                USB_PERMISSION -> {
+                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                        // user choose YES for your previously popup window asking for grant permission for this usb device
+                        when (usbDevice.productId) {
+                            xPrinterService.supportedDevice?.productId -> {
+                                try {
+                                    xPrinterService.connectDevice(usbDevice)
+
+                                    val commandList = arrayListOf(
+                                        PrinterBuffer.initializePrinter(),
+                                        PrinterBuffer.selectAlignment(PrinterBuffer.Alignment.CENTER),
+                                        PrinterBuffer.selectCharacterSize(PrinterBuffer.CharacterSize.XXSMALL),
+                                        strToBytes("煩請親自依「掛號燈號」至櫃檯掛號。過號或號碼單遺失者，請重新抽號。"),
+                                        PrinterBuffer.printAndFeedLine(),
+                                        strToBytes(String.format("%04d", 69)),
+                                        PrinterBuffer.printAndFeedLine(),
+                                        PrinterBuffer.selectAlignment(PrinterBuffer.Alignment.CENTER),
+                                        PrinterBuffer.selectHRICharacterPrintPosition(PrinterBuffer.HRIAlignment.BOTTOM),
+                                        PrinterBuffer.setBarcodeWidth(3),
+                                        PrinterBuffer.setBarcodeHeight(162),
+                                        PrinterBuffer.printBarcode(PrinterBuffer.BarCodeSystem2.CODE39, 10, "B12345789"),
+                                        PrinterBuffer.printAndFeedLine(),
+                                        PrinterBuffer.selectCutPagerModerAndCutPager(66, 1),
+                                    )
+
+                                    commandList.forEach {
+                                        xPrinterService.write(it)
+                                    }
+
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        }
+                    } else {
+                        // user choose NO for your previously popup window asking for grant permission for this usb device
+                    }
+                }
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                    connectUSBDevice(usbDevice)
+                }
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                    when (usbDevice.productId) {
+                        xPrinterService.connectedDevice?.productId -> {
+                            xPrinterService.disconnect()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun strToBytes(str: String): ByteArray =
+        try {
+            str.toByteArray(charset("big5"))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            byteArrayOf()
+        }
+
+    private lateinit var usbManager: UsbManager
+
+    private lateinit var xPrinterService: BPT3XPrinterService
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        mainRecyclerView.adapter = mainAdapter
+//        mainRecyclerView.adapter = mainAdapter
+//
+//        val bluetoothStateFilter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+//        registerReceiver(
+//            detectBluetoothStateReceiver,
+//            bluetoothStateFilter
+//        )
+//
+//        val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
+//        registerReceiver(detectBluetoothDeviceReceiver, filter)
+//
+//        requestBluetoothPermissions()
+//
+//        printService = BluetoothPrinterService(this, printCallback)
 
-        val bluetoothStateFilter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
-        registerReceiver(
-            detectBluetoothStateReceiver,
-            bluetoothStateFilter
-        )
-
-        val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
-        registerReceiver(detectBluetoothDeviceReceiver, filter)
-
-        requestBluetoothPermissions()
-
-        printService = BluetoothPrinterService(this, printCallback)
+        setupUSB()
     }
 
     override fun onResume() {
         super.onResume()
 
-        requestBluetoothPermissions()
+//        requestBluetoothPermissions()
     }
 
     override fun onPause() {
         super.onPause()
 
-        stopScan()
+//        stopScan()
     }
 
     private fun requestBluetoothPermissions() {
@@ -205,6 +275,35 @@ class MainActivity : AppCompatActivity() {
         if (bluetoothAdapter.isEnabled) {
             bluetoothAdapter.cancelDiscovery()
         }
+    }
+
+    private fun setupUSB() {
+        val usbFilter = IntentFilter(USB_PERMISSION)
+        usbFilter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+        usbFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+
+        registerReceiver(
+            detectUsbDeviceReceiver,
+            usbFilter
+        )
+
+        usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+
+        xPrinterService = BPT3XPrinterService(usbManager)
+        xPrinterService.supportedDevice?.also {
+            connectUSBDevice(it)
+        }
+    }
+
+    private fun connectUSBDevice(device: UsbDevice) {
+        val mPermissionIntent = PendingIntent.getBroadcast(
+            this,
+            0,
+            Intent(USB_PERMISSION),
+            0
+        )
+
+        usbManager.requestPermission(device, mPermissionIntent)
     }
 
     override fun onDestroy() {

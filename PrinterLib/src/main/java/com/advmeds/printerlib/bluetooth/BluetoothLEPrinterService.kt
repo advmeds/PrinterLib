@@ -1,7 +1,10 @@
-package com.advmeds.printerlib
+package com.advmeds.printerlib.bluetooth
 
 import android.app.Service
-import android.bluetooth.*
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCallback
+import android.bluetooth.BluetoothProfile
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
