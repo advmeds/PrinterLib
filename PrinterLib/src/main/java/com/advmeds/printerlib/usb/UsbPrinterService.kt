@@ -8,12 +8,12 @@ abstract class UsbPrinterService(private val usbManager: UsbManager) {
         get() = usbManager.deviceList.values.find { isSupported(it) }
 
     /** 取得已連線的USB裝置 */
-    public var connectedDevice: UsbDevice? = null
+    public open var connectedDevice: UsbDevice? = null
     private var usbConnection: UsbDeviceConnection? = null
     private var usbInterface: UsbInterface? = null
     private var epOut: UsbEndpoint? = null
     private var epIn: UsbEndpoint? = null
-    private val isOpened: Boolean
+    open val isOpened: Boolean
         get() = usbConnection != null
 
     /**
@@ -21,14 +21,14 @@ abstract class UsbPrinterService(private val usbManager: UsbManager) {
      *
      * NOTE：目前發現若拔出已經連線成功的設備但是未呼叫 disconnect()，則該變數仍然會回傳true。
      */
-    public val isConnected: Boolean
+    open val isConnected: Boolean
         get() = isOpened && connectedDevice != null
 
     /** 是否支援該USB裝置 */
     public abstract fun isSupported(device: UsbDevice): Boolean
 
     /** 連線USB裝置 */
-    public fun connectDevice(device: UsbDevice) {
+    public open fun connectDevice(device: UsbDevice) {
         // 檢查當前是否已連線
         if (isOpened) {
             // 若已連線則在檢查已連線的裝置是否與準備要連線的裝置相同
@@ -77,7 +77,7 @@ abstract class UsbPrinterService(private val usbManager: UsbManager) {
     }
 
     /** 斷線 */
-    public fun disconnect() {
+    public open fun disconnect() {
         usbConnection?.releaseInterface(usbInterface)
         usbConnection?.close()
         usbConnection = null
@@ -87,7 +87,7 @@ abstract class UsbPrinterService(private val usbManager: UsbManager) {
         epIn = null
     }
 
-    public fun write(data: ByteArray) {
+    public open fun write(data: ByteArray) {
         val connection = requireNotNull(usbConnection) { "The printer is not opened." }
 
         val size = connection.bulkTransfer(epOut, data, data.size, 3000)
@@ -95,7 +95,7 @@ abstract class UsbPrinterService(private val usbManager: UsbManager) {
         require(size >= 0) { "The printer bulkTransfer failed!" }
     }
 
-    public fun read(bufferSize: Int = DEFAULT_BUFFER_SIZE): ByteArray {
+    public open fun read(bufferSize: Int = DEFAULT_BUFFER_SIZE): ByteArray {
         val connection = requireNotNull(usbConnection) { "The printer is not opened." }
 
         val receiveBytes = ByteArray(bufferSize)

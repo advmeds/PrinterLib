@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.advmeds.printerlib.bluetooth.BluetoothPrinterService
 import com.advmeds.printerlib.bluetooth.PrinterServiceDelegate
 import com.advmeds.printerlib.usb.BPT3XPrinterService
+import com.advmeds.printerlib.usb.UsbPrinterService
 import com.advmeds.printerlib.utils.PrinterBuffer
 
 class MainActivity : AppCompatActivity() {
@@ -136,9 +137,9 @@ class MainActivity : AppCompatActivity() {
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
                         // user choose YES for your previously popup window asking for grant permission for this usb device
                         when (usbDevice.productId) {
-                            xPrinterService.supportedDevice?.productId -> {
+                            usbPrinterService.supportedDevice?.productId -> {
                                 try {
-                                    xPrinterService.connectDevice(usbDevice)
+                                    usbPrinterService.connectDevice(usbDevice)
 
                                     val commandList = arrayListOf(
                                         PrinterBuffer.initializePrinter(),
@@ -158,7 +159,7 @@ class MainActivity : AppCompatActivity() {
                                     )
 
                                     commandList.forEach {
-                                        xPrinterService.write(it)
+                                        usbPrinterService.write(it)
                                     }
 
                                 } catch (e: Exception) {
@@ -175,8 +176,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 UsbManager.ACTION_USB_DEVICE_DETACHED -> {
                     when (usbDevice.productId) {
-                        xPrinterService.connectedDevice?.productId -> {
-                            xPrinterService.disconnect()
+                        usbPrinterService.connectedDevice?.productId -> {
+                            usbPrinterService.disconnect()
                         }
                     }
                 }
@@ -194,7 +195,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var usbManager: UsbManager
 
-    private lateinit var xPrinterService: BPT3XPrinterService
+    private lateinit var usbPrinterService: UsbPrinterService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -289,8 +290,8 @@ class MainActivity : AppCompatActivity() {
 
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
 
-        xPrinterService = BPT3XPrinterService(usbManager)
-        xPrinterService.supportedDevice?.also {
+        usbPrinterService = BPT3XPrinterService(usbManager)
+        usbPrinterService.supportedDevice?.also {
             connectUSBDevice(it)
         }
     }
