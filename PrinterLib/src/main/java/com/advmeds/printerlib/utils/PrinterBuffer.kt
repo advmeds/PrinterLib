@@ -1,5 +1,8 @@
 package com.advmeds.printerlib.utils
 
+import android.graphics.Bitmap
+import net.posprinter.utils.BitmapToByteData
+
 public object PrinterBuffer {
     public enum class CharacterSize(val rawValue: Byte) {
         XXSMALL(0x00.toByte()),
@@ -212,7 +215,7 @@ public object PrinterBuffer {
         dxL: Int,
         dxH: Int,
         dyL: Int,
-        dyH: Int
+        dyH: Int,
     ): ByteArray {
         return byteArrayOf(
             27, 87,
@@ -308,7 +311,7 @@ public object PrinterBuffer {
 
     fun setVerticalRelativePositionUnderPageModel(
         nL: Int,
-        nH: Int
+        nH: Int,
     ): ByteArray {
         return byteArrayOf(29, 92, nL.toByte(), nH.toByte())
     }
@@ -347,6 +350,18 @@ public object PrinterBuffer {
 
     fun returnState(n: Int): ByteArray {
         return byteArrayOf(29, 114, n.toByte())
+    }
+
+    fun printRasterBmp(
+        bitmap: Bitmap
+    ): ByteArray {
+        return BitmapToByteData.rasterBmpToSendData(
+            0,
+            bitmap,
+            BitmapToByteData.BmpType.Threshold,
+            BitmapToByteData.AlignType.Center,
+            bitmap.width
+        )
     }
 
     fun setBarcodeWidth(n: Int): ByteArray {
@@ -390,7 +405,7 @@ public object PrinterBuffer {
     fun printerOrderBuzzingAndWarningLight(
         m: Int,
         t: Int,
-        n: Int
+        n: Int,
     ): ByteArray {
         return byteArrayOf(27, 67, m.toByte(), t.toByte(), n.toByte())
     }
@@ -499,7 +514,7 @@ public object PrinterBuffer {
     fun storesSymbolDataInTheMaxiCodeSymbolStorageArea(
         pL: Int,
         pH: Int,
-        b: ByteArray
+        b: ByteArray,
     ): ByteArray {
         var data = byteArrayOf(
             29, 40, 107,
