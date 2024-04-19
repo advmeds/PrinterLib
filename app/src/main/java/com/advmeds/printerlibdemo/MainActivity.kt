@@ -140,6 +140,7 @@ class MainActivity : AppCompatActivity() {
                             usbPrinterService.supportedDevice?.productId -> {
                                 try {
                                     usbPrinterService.connectDevice(usbDevice)
+//                                    usbPrinterService.printPdf()
 
                                     val commandList = arrayListOf(
                                         PrinterBuffer.initializePrinter(),
