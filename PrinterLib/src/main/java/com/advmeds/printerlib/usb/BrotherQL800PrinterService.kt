@@ -67,34 +67,16 @@ class BrotherQL800PrinterService(private val context: Context) : UsbPrinterServi
         driver = null
     }
 
-    fun printPdf() {
-        val driver = requireNotNull(driver) { "The printer is not opened." }
-        val pdfFile = buildChiaYiInfo(
-            "  陳大同  ",
-            "  A1234846892  ",
-            "  0974593672  ",
-            "  80/07/03  ",
-            "  嘉義市東區復原莊191號12樓  "
-        )
-        val settings = QLPrintSettings(PrinterModel.QL_800).apply {
-            workPath = context.getExternalFilesDir(null)?.absolutePath ?: ""
-            isAutoCut = true
-            labelSize = QLPrintSettings.LabelSize.DieCutW29H90
-        }
-        val error = driver.printPDF(pdfFile, settings)
-        require(error.code == ErrorCode.NoError) {
-            error.code.toString()
-        }
-    }
-
-    /** 建構嘉義西區的個資貼紙 */
-    private fun buildChiaYiInfo(
+    /** 建構嘉義西區的個資貼紙，適用於 29mm * 90mm 紙卷 */
+    fun printChiaYiInfo(
         name: String,
         idNo: String,
         mobile: String,
         birth: String,
         address: String
-    ): String? {
+    ) {
+        val driver = requireNotNull(driver) { "The printer is not opened." }
+
         // create a new document
         val document = PdfDocument()
 
@@ -199,12 +181,21 @@ class BrotherQL800PrinterService(private val context: Context) : UsbPrinterServi
         // finish the page
         document.finishPage(page)
 
-        val filePath = File(context.getExternalFilesDir(null), "test.pdf")
+        val filePath = File(context.cacheDir, "info.pdf")
         document.writeTo(FileOutputStream(filePath.absolutePath))
 
         // close the document
         document.close()
-        return filePath.absolutePath
+
+        val settings = QLPrintSettings(PrinterModel.QL_800).apply {
+            workPath = context.getExternalFilesDir(null)?.absolutePath ?: ""
+            isAutoCut = true
+            labelSize = QLPrintSettings.LabelSize.DieCutW29H90
+        }
+        val error = driver.printPDF(filePath.absolutePath, settings)
+        require(error.code == ErrorCode.NoError) {
+            error.code.toString()
+        }
     }
 
     private fun createBarcodeBitmap(
