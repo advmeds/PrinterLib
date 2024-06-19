@@ -130,7 +130,6 @@ class BrotherQL800PrinterService(private val context: Context) : UsbPrinterServi
                 setSpan(UnderlineSpan(), birthIndex, birthIndex + birth.length, Spannable.SPAN_INCLUSIVE_INCLUSIVE)
                 setSpan(UnderlineSpan(), addressIndex, addressIndex + address.length, Spannable.SPAN_INCLUSIVE_INCLUSIVE)
             }
-            isSingleLine = true
             layout(0, 0, pageHeight, pageWidth)
             setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize.toFloat())
             setTextColor(Color.BLACK)
