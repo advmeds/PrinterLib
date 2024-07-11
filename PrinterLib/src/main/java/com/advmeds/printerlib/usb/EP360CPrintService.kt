@@ -12,6 +12,10 @@ class EP360CPrintService(private val context: Context) : UsbPrinterService(conte
 ) {
     private val mPos = CSNPOS()
     private val mUsb = CSNUSBPrinting()
+
+    override val isOpened: Boolean
+        get() = mUsb.IsOpened()
+
     override fun isSupported(device: UsbDevice): Boolean = device.vendorId == 4070
 
     override fun connectDevice(device: UsbDevice) {
@@ -38,6 +42,8 @@ class EP360CPrintService(private val context: Context) : UsbPrinterService(conte
 
         val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
         mUsb.Open(usbManager, device, context)
+
+        this.connectedDevice = device
     }
 
     override fun write(data: ByteArray) {
