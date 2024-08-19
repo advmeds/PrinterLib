@@ -28,6 +28,8 @@ android {
         jvmTarget = '1.8'
     }
     namespace 'com.advmeds.printerlib'
+
+
 }
 
 dependencies {

@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.BitmapFactory
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Bundle
@@ -16,8 +17,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import com.advmeds.printerlib.bluetooth.BluetoothPrinterService
 import com.advmeds.printerlib.bluetooth.PrinterServiceDelegate
-import com.advmeds.printerlib.usb.BPT3XPrinterService
+import com.advmeds.printerlib.usb.EP360CPrintService
 import com.advmeds.printerlib.usb.UsbPrinterService
+import com.advmeds.printerlib.utils.EP360CPrinterBuffer
 import com.advmeds.printerlib.utils.PrinterBuffer
 
 class MainActivity : AppCompatActivity() {
@@ -142,21 +144,65 @@ class MainActivity : AppCompatActivity() {
                                     usbPrinterService.connectDevice(usbDevice)
 //                                    usbPrinterService.printPdf()
 
+//                                    val commandList = arrayListOf(
+//                                        PrinterBuffer.initializePrinter(),
+//                                        PrinterBuffer.selectAlignment(PrinterBuffer.Alignment.CENTER),
+//                                        PrinterBuffer.selectCharacterSize(PrinterBuffer.CharacterSize.XXSMALL),
+//                                        strToBytes("煩請親自依「掛號燈號」至櫃檯掛號。過號或號碼單遺失者，請重新抽號。"),
+//                                        PrinterBuffer.printAndFeedLine(),
+//                                        strToBytes(String.format("%04d", 69)),
+//                                        PrinterBuffer.printAndFeedLine(),
+//                                        PrinterBuffer.selectAlignment(PrinterBuffer.Alignment.CENTER),
+//                                        PrinterBuffer.selectHRICharacterPrintPosition(PrinterBuffer.HRIAlignment.BOTTOM),
+//                                        PrinterBuffer.setBarcodeWidth(3),
+//                                        PrinterBuffer.setBarcodeHeight(162),
+//                                        PrinterBuffer.printBarcode(PrinterBuffer.BarCodeSystem2.CODE39, 10, "B12345789"),
+//                                        PrinterBuffer.printAndFeedLine(),
+//                                        PrinterBuffer.selectCutPagerModerAndCutPager(66, 1),
+//                                    )
+
+
+                                    val bitmap = BitmapFactory.decodeResource(resources, R.drawable.test)
                                     val commandList = arrayListOf(
-                                        PrinterBuffer.initializePrinter(),
-                                        PrinterBuffer.selectAlignment(PrinterBuffer.Alignment.CENTER),
-                                        PrinterBuffer.selectCharacterSize(PrinterBuffer.CharacterSize.XXSMALL),
-                                        strToBytes("煩請親自依「掛號燈號」至櫃檯掛號。過號或號碼單遺失者，請重新抽號。"),
-                                        PrinterBuffer.printAndFeedLine(),
-                                        strToBytes(String.format("%04d", 69)),
-                                        PrinterBuffer.printAndFeedLine(),
-                                        PrinterBuffer.selectAlignment(PrinterBuffer.Alignment.CENTER),
-                                        PrinterBuffer.selectHRICharacterPrintPosition(PrinterBuffer.HRIAlignment.BOTTOM),
-                                        PrinterBuffer.setBarcodeWidth(3),
-                                        PrinterBuffer.setBarcodeHeight(162),
-                                        PrinterBuffer.printBarcode(PrinterBuffer.BarCodeSystem2.CODE39, 10, "B12345789"),
-                                        PrinterBuffer.printAndFeedLine(),
-                                        PrinterBuffer.selectCutPagerModerAndCutPager(66, 1),
+                                        EP360CPrinterBuffer.initializePrinter(),
+                                        EP360CPrinterBuffer.printPicture(bitmap, 576, 1, 0),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.align(EP360CPrinterBuffer.Alignment.CENTER),
+                                        EP360CPrinterBuffer.textOut("上午 掛號", textWidth = 7, textHeight = 4, fontStyle = EP360CPrinterBuffer.TextStyle.BOLD),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.textOut("1001", textWidth = 7, textHeight = 4, fontStyle = EP360CPrinterBuffer.TextStyle.BOLD),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.textOut("2024/07/01 15:12:32", textWidth = 1, textHeight = 1),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.textOut("請依號碼 等候叫號", textWidth = 1, textHeight = 1),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.textOut("過號超過30號請重新取票", textWidth = 1, textHeight = 1, fontStyle = EP360CPrinterBuffer.TextStyle.BOLD_UNDER_LINE),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.feedLine(),
+
+//                                        EP360CPrinterBuffer.setBarCode("Hi,Test", 0),
+//                                        EP360CPrinterBuffer.feedLine(),
+//                                        EP360CPrinterBuffer.feedLine(),
+//                                        EP360CPrinterBuffer.feedLine(),
+//                                        EP360CPrinterBuffer.setQRCode("HiTest", versionSize = 8),
+//                                        EP360CPrinterBuffer.feedLine(),
+//                                        EP360CPrinterBuffer.feedLine(),
+//                                        EP360CPrinterBuffer.feedLine(),
+//                                        EP360CPrinterBuffer.feedLine(),
+//                                        EP360CPrinterBuffer.setDoubleQRCode("乾電池:1:105", 20, 4, 8, "口罩:1:210:牛奶:1:25", 230, 4, 8, 4),
+//                                        EP360CPrinterBuffer.feedLine(),
+//                                        EP360CPrinterBuffer.feedLine(),
+//                                        EP360CPrinterBuffer.feedLine(),
+                                        EP360CPrinterBuffer.fullCutPaper()
                                     )
 
                                     commandList.forEach {
@@ -291,7 +337,7 @@ class MainActivity : AppCompatActivity() {
 
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
 
-        usbPrinterService = BPT3XPrinterService(usbManager)
+        usbPrinterService = EP360CPrintService(context = this)
         usbPrinterService.supportedDevice?.also {
             connectUSBDevice(it)
         }

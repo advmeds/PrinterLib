@@ -28,13 +28,20 @@ import java.io.File
 import java.io.FileOutputStream
 
 class BrotherQL800PrinterService(private val context: Context) : UsbPrinterService(context.getSystemService(Context.USB_SERVICE) as UsbManager) {
+
+    companion object {
+        private fun isSupport(device: UsbDevice): Boolean = device.vendorId == 1273
+
+        fun isSupported(usbManager: UsbManager): UsbDevice? =
+            usbManager.deviceList.values.find { isSupport(it) }
+    }
+
     private var driver: PrinterDriver? = null
     override val isOpened: Boolean
         get() = driver != null
 
     /** @see UsbConnection.isBrotherPrinter */
-    override fun isSupported(device: UsbDevice): Boolean =
-        device.vendorId == 1273
+    override fun isSupported(device: UsbDevice): Boolean = isSupport(device)
 
     override fun connectDevice(device: UsbDevice) {
         // 檢查當前是否已連線
