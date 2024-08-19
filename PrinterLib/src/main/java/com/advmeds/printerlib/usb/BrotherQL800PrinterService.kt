@@ -193,7 +193,7 @@ class BrotherQL800PrinterService(private val context: Context) : UsbPrinterServi
         }
         val error = driver.printPDF(filePath.absolutePath, settings)
         require(error.code == ErrorCode.NoError) {
-            error.code.toString()
+            error.errorDescription
         }
     }
 
