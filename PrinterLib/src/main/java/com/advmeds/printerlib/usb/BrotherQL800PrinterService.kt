@@ -11,6 +11,7 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.text.Spannable
 import android.text.SpannableStringBuilder
+import android.text.style.StyleSpan
 import android.text.style.UnderlineSpan
 import android.util.TypedValue
 import android.widget.TextView
@@ -26,6 +27,8 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.oned.Code128Writer
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
 
 class BrotherQL800PrinterService(private val context: Context) : UsbPrinterService(context.getSystemService(Context.USB_SERVICE) as UsbManager) {
 
@@ -74,7 +77,144 @@ class BrotherQL800PrinterService(private val context: Context) : UsbPrinterServi
         driver = null
     }
 
-    /** 建構嘉義西區的個資貼紙，適用於 29mm * 90mm 紙卷 */
+    /** 建構嘉義西區的試管標籤列印，適用於 52mm * 29mm 紙卷 */
+    fun printChiaYiInfo(
+        orgName: String,
+        name: String,
+        gender: String
+    ) {
+        val driver = requireNotNull(driver) { "The printer is not opened." }
+
+        // create a new document
+        val document = PdfDocument()
+
+        val orgNameTextSize = 40
+        val fullNameTextSize = 48
+        val dateTimeTextSize = 32
+        val pageWidth = 520
+        val pageHeight = 232
+        val defaultPadding = 16
+        val verticalPadding = 32 - defaultPadding
+        val horizontalPadding = 60 - defaultPadding
+        // crate a page description
+        val pageInfo = PageInfo.Builder(pageWidth, pageHeight, 1).create()
+
+        // start a page
+        val page = document.startPage(pageInfo)
+
+        // Adding title
+        TextView(context).apply {
+            val titleSpannedString = SpannableStringBuilder().apply {
+                append(orgName)
+                setSpan(StyleSpan(Typeface.BOLD), 0, orgName.length, Spannable.SPAN_INCLUSIVE_INCLUSIVE)
+            }
+            isSingleLine = true
+            layout(0, 0, pageWidth, pageHeight)
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, orgNameTextSize.toFloat())
+            setTextColor(Color.BLACK)
+            text = titleSpannedString
+            isDrawingCacheEnabled = true
+        }.run {
+            measure(0, 0)
+
+            page.canvas.drawBitmap(
+                drawingCache,
+                pageWidth.div(2f).minus(measuredWidth.div(2)),
+                verticalPadding.toFloat(),
+                null
+            )
+        }
+
+        // Adding fullName
+        TextView(context).apply {
+            val titleSpannedString = SpannableStringBuilder().apply {
+                append(name)
+                setSpan(StyleSpan(Typeface.BOLD), 0, name.length, Spannable.SPAN_INCLUSIVE_INCLUSIVE)
+            }
+            isSingleLine = true
+            layout(0, 0, pageWidth, pageHeight)
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, fullNameTextSize.toFloat())
+            setTextColor(Color.BLACK)
+            text = titleSpannedString
+            isDrawingCacheEnabled = true
+        }.run {
+            measure(0, 0)
+
+            page.canvas.drawBitmap(
+                drawingCache,
+                horizontalPadding.toFloat(),
+                pageHeight.div(2f).minus(measuredHeight.div(2)),
+                null
+            )
+        }
+
+        // Adding gender
+        TextView(context).apply {
+            val titleSpannedString = SpannableStringBuilder().apply {
+                append(gender)
+                setSpan(StyleSpan(Typeface.BOLD), 0, gender.length, Spannable.SPAN_INCLUSIVE_INCLUSIVE)
+            }
+            isSingleLine = true
+            layout(0, 0, pageWidth, pageHeight)
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, fullNameTextSize.toFloat())
+            setTextColor(Color.BLACK)
+            text = titleSpannedString
+            isDrawingCacheEnabled = true
+        }.run {
+            measure(0, 0)
+
+            page.canvas.drawBitmap(
+                drawingCache,
+                pageWidth.minus(measuredWidth).minus(horizontalPadding).toFloat(),
+                pageHeight.div(2f).minus(measuredHeight.div(2)),
+                null
+            )
+        }
+
+        // Adding Date and Time
+        TextView(context).apply {
+            val titleSpannedString = SpannableStringBuilder().apply {
+                val formatter = SimpleDateFormat.getDateTimeInstance(SimpleDateFormat.MEDIUM, SimpleDateFormat.MEDIUM)
+                append(formatter.format(Date()))
+            }
+            isSingleLine = true
+            layout(0, 0, pageWidth, pageHeight)
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, dateTimeTextSize.toFloat())
+            setTextColor(Color.BLACK)
+            text = titleSpannedString
+            isDrawingCacheEnabled = true
+        }.run {
+            measure(0, 0)
+
+            page.canvas.drawBitmap(
+                drawingCache,
+                pageWidth.div(2f).minus(measuredWidth.div(2)),
+                pageHeight.minus(measuredHeight).minus(verticalPadding).toFloat(),
+                null
+            )
+        }
+
+        // finish the page
+        document.finishPage(page)
+
+        val filePath = File(context.cacheDir, "info.pdf")
+        document.writeTo(FileOutputStream(filePath.absolutePath))
+
+        // close the document
+        document.close()
+
+        val settings = QLPrintSettings(PrinterModel.QL_800).apply {
+            workPath = context.getExternalFilesDir(null)?.absolutePath ?: ""
+            isAutoCut = true
+            labelSize = QLPrintSettings.LabelSize.DieCutW52H29
+        }
+        val error = driver.printPDF(filePath.absolutePath, settings)
+        require(error.code == ErrorCode.NoError) {
+            error.errorDescription
+        }
+    }
+
+    /** 建構嘉義西區的基本資料列印，適用於 29mm * 90mm 紙卷 */
     fun printChiaYiInfo(
         name: String,
         idNo: String,
